@@ -6,8 +6,8 @@ exports.analyzeBountyPage = async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ success: false, message: 'URL is required' });
     console.log(`Analyzing bounty page: ${url}`);
-    const { text } = await fetchPageContent(url);
-    const scope = await extractBountyScope(text, url);
+    const { text, html } = await fetchPageContent(url);
+    const scope = await extractBountyScope(text, url, html);
     res.json({ success: true, data: scope });
   } catch (err) {
     console.error('Bounty analyze error:', err);
