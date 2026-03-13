@@ -4,7 +4,7 @@ const OPENROUTER_API = 'https://openrouter.ai/api/v1/chat/completions';
 const MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-8b-instruct:free';
 
 function isValidApiKey(key) {
-  return key && key.length > 20 && !key.includes('free') && !key.includes('placeholder') && !key.includes('your_key') && key.startsWith('sk-');
+  return key && key.length > 20 && !key.includes('placeholder') && !key.includes('your_key') && key.startsWith('sk-');
 }
 
 async function callAI(systemPrompt, userPrompt) {
@@ -124,7 +124,7 @@ function smartParseBountyPage(text, html, pageUrl) {
     report_format: 'Standard vulnerability report with steps to reproduce, impact, and PoC',
     severity_levels: ['critical', 'high', 'medium', 'low'],
     platform_guidelines_url: pageUrl,
-    note: 'Extracted via smart parser. Add an OpenRouter API key at openrouter.ai for enhanced AI analysis.'
+    note: process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.length > 20 ? 'Extracted via smart parser (page may require login for full scope)' : 'Extracted via smart parser. Add an OpenRouter API key at openrouter.ai for enhanced AI analysis.'
   };
 }
 

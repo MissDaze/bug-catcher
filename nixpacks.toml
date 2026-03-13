@@ -1,15 +1,17 @@
 [phases.setup]
-nixPkgs = ['nodejs_20']
+nixPkgs = ['nodejs_20', 'chromium', 'nss', 'atk', 'cups', 'libdrm', 'xorg.libXcomposite', 'xorg.libXdamage', 'xorg.libXrandr', 'mesa', 'xorg.libXtst', 'pango', 'alsa-lib']
 
 [phases.install]
 cmds = [
-  'cd backend && npm install --production=false',
-  'cd frontend && npm install'
+  'cd backend && npm ci',
+  'cd frontend && npm ci',
+  'cd backend && npx playwright install chromium || true'
 ]
 
 [phases.build]
 cmds = [
-  'cd frontend && CI=false npm run build'
+  'cd frontend && CI=false npm run build',
+  'cp -r frontend/build backend/build'
 ]
 
 [start]

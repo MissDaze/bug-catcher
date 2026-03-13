@@ -1,7 +1,51 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 
+const JS_HEAVY_DOMAINS = [
+  'hackerone.com', 'bugcrowd.com', 'intigriti.com',
+  'yeswehack.com', 'synack.com', 'cobalt.io',
+  'immunefi.com', 'federacy.com', 'integrity.st'
+];
+
+async function fetchWithPlaywright(url) {
+  let browser = null;
+  try {
+    const { chromium } = require('playwright');
+    browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    });
+    const page = await browser.newPage();
+    await page.setExtraHTTPHeaders({
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+    // Wait extra for SPA content
+    await page.waitForTimeout(3000);
+    const html = await page.content();
+    const $ = cheerio.load(html);
+    $('script, style, nav, footer, header').remove();
+    const text = $('body').text().replace(/\s+/g, ' ').trim();
+    return { text, html, status: 200, url };
+  } catch (err) {
+    throw new Error(`Playwright fetch failed: ${err.message}`);
+  } finally {
+    if (browser) await browser.close();
+  }
+}
+
 async function fetchPageContent(url) {
+  const isJsHeavy = JS_HEAVY_DOMAINS.some(d => url.includes(d));
+  
+  if (isJsHeavy) {
+    try {
+      console.log(`Using Playwright for JS-heavy page: ${url}`);
+      return await fetchWithPlaywright(url);
+    } catch (pwErr) {
+      console.warn(`Playwright failed, falling back to axios: ${pwErr.message}`);
+    }
+  }
+  
   try {
     const response = await axios.get(url, {
       headers: {
@@ -13,7 +57,6 @@ async function fetchPageContent(url) {
       maxRedirects: 5
     });
     const $ = cheerio.load(response.data);
-    // Remove scripts and styles for cleaner text
     $('script, style, nav, footer').remove();
     const text = $('body').text().replace(/\s+/g, ' ').trim();
     const html = response.data;
