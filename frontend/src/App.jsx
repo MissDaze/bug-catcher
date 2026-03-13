@@ -189,7 +189,7 @@ function ScopeSelector({ scope, selected, onToggle, credentials, onCredsChange }
   );
 }
 
-function BountyAnalyzer({ onStartScan, logs, setLogs, scanActive }) {
+function BountyAnalyzer({ onStartScan, logs, setLogs, scanActive, crawlEnabled, setCrawlEnabled }) {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [scope, setScope] = useState(null);
@@ -294,6 +294,15 @@ function BountyAnalyzer({ onStartScan, logs, setLogs, scanActive }) {
           )}
 
           {selected.size > 0 && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--bg3)', border: 'var(--border)', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--green)', fontSize: 12 }}>
+                <input type="checkbox" checked={crawlEnabled} onChange={e => setCrawlEnabled(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: 'var(--green)', cursor: 'pointer' }} />
+                <span>🕷️ Enable Crawler (discover additional in-scope URLs, depth 2, max 50 per target)</span>
+              </label>
+            </div>
+          )}
+          {selected.size > 0 && (
             <button className="btn btn-primary btn-full mt-16" onClick={handleStartScan} disabled={scanActive}>
               {scanActive ? <><span className="spinner"></span> Scan Running...</> : `🚀 Start Scan (${selected.size} targets)`}
             </button>
@@ -304,7 +313,7 @@ function BountyAnalyzer({ onStartScan, logs, setLogs, scanActive }) {
   );
 }
 
-function DirectScanner({ onStartScan, scanActive }) {
+function DirectScanner({ onStartScan, scanActive, crawlEnabled, setCrawlEnabled }) {
   const [url, setUrl] = useState('');
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -329,11 +338,20 @@ function DirectScanner({ onStartScan, scanActive }) {
           {scanActive ? <><span className="spinner"></span> Scan Running...</> : '⚡ Scan Target'}
         </button>
       </form>
-      <div style={{ marginTop: 16, padding: 12, background: 'var(--bg3)', borderRadius: 4, border: 'var(--border)' }}>
-        <div style={{ color: 'var(--green)', fontSize: 11, marginBottom: 8 }}>Checks performed:</div>
-        {['XSS / Injection', 'Security Headers', 'SSL/TLS Config', 'Open Redirect', 'Sensitive Files', 'Cookie Security', 'CORS Misconfiguration'].map(c => (
-          <div key={c} style={{ color: 'var(--gray)', fontSize: 11, padding: '3px 0' }}>✓ {c}</div>
-        ))}
+      <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--bg3)', border: 'var(--border)', borderRadius: 4 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--green)', fontSize: 12 }}>
+          <input type="checkbox" checked={crawlEnabled} onChange={e => setCrawlEnabled(e.target.checked)}
+            style={{ width: 16, height: 16, accentColor: 'var(--green)', cursor: 'pointer' }} />
+          <span>🕷️ Enable Crawler (discover in-scope URLs, depth 2, max 50)</span>
+        </label>
+      </div>
+      <div style={{ marginTop: 10, padding: 12, background: 'var(--bg3)', borderRadius: 4, border: 'var(--border)' }}>
+        <div style={{ color: 'var(--green)', fontSize: 11, marginBottom: 8, fontFamily: 'var(--font-title)' }}>29 VULNERABILITY CHECKS:</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
+          {['XSS (Active Injection)','SQL Injection','Blind SQLi (Time-based)','SSTI (All engines)','Command Injection','Path Traversal / LFI','IDOR (ID Enumeration)','XXE Injection','SSRF Testing','JWT Analysis','Security Headers','SSL/TLS Config','Cookie Security','CORS Misconfiguration','Open Redirect','Sensitive Files (50+)','HTTP Methods (TRACE/PUT)','Directory Listing','Source Map Exposure','API Key Exposure in JS','GraphQL Introspection','Subdomain Takeover','CRLF Injection','Web Cache Poisoning','Prototype Pollution','Rate Limit Testing','Clickjacking','Info Disclosure','Broken Link Hijacking'].map(c => (
+            <div key={c} style={{ color: 'var(--gray)', fontSize: 10, padding: '2px 0' }}>✓ {c}</div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -369,6 +387,7 @@ export default function App() {
   const [resultsTab, setResultsTab] = useState('findings');
   const [viewShot, setViewShot] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [crawlEnabled, setCrawlEnabled] = useState(false);
   const socketRef = useRef(null);
 
   const addLog = useCallback((msg, type = 'info') => {
@@ -385,7 +404,8 @@ export default function App() {
     setMainTab('scan');
     addLog(`🚀 Initiating scan of ${urls.length} target(s)...`, 'info');
     try {
-      const res = await axios.post(`${API}/api/scan/start`, { urls, programInfo: program });
+      const inScopeList = program ? (program.in_scope || []) : [];
+      const res = await axios.post(`${API}/api/scan/start`, { urls, programInfo: program, crawl: crawlEnabled, inScopeList });
       const id = res.data.scanId;
       setScanId(id);
       addLog(`✅ Scan ID: ${id}`, 'success');
@@ -397,7 +417,7 @@ export default function App() {
       addLog(`❌ Failed to start scan: ${err.response?.data?.message || err.message}`, 'error');
       setScanActive(false);
     }
-  }, [scanActive, addLog]);
+  }, [scanActive, addLog, crawlEnabled]);
 
   const cancelScan = useCallback(async () => {
     if (!scanId) return;
@@ -443,9 +463,18 @@ export default function App() {
     socket.on('scan_complete', (data) => {
       setScanActive(false);
       setProgress({ percent: 100, step: 'Complete' });
-      addLog(`🏁 SCAN COMPLETE — ${data.findingCount} findings, ${data.screenshotCount} screenshots, ${Math.round(data.duration/1000)}s`, 'success');
+      addLog(`🏁 SCAN COMPLETE — ${data.totalFindings || 0} findings (${data.criticalCount || 0} critical, ${data.highCount || 0} high) across ${data.scannedUrls || 0} URLs`, 'success');
       setResultsTab('findings');
       setMainTab('results');
+    });
+    socket.on('scan_progress', (data) => {
+      if (data.current && data.total) {
+        setProgress({ percent: Math.round((data.current / data.total) * 100), step: `Scanning ${data.current}/${data.total}: ${data.url || ''}` });
+      }
+    });
+    socket.on('reconnect', () => {
+      addLog('🔌 Socket reconnected', 'success');
+      if (scanId) { socket.emit('join_scan', scanId); addLog('📡 Rejoined scan room', 'info'); }
     });
     socket.on('scan_error', (data) => {
       setScanActive(false);
@@ -466,7 +495,7 @@ export default function App() {
         <div className="tabs">
           <button className={`tab-btn ${mainTab === 'analyzer' ? 'active' : ''}`} onClick={() => setMainTab('analyzer')}>🎯 Bounty Analyzer</button>
           <button className={`tab-btn ${mainTab === 'scanner' ? 'active' : ''}`} onClick={() => setMainTab('scanner')}>🔬 Direct Scanner</button>
-          <button className={`tab-btn ${mainTab === 'scan' ? 'active' : ''}`} onClick={() => setMainTab('scan')} style={{ display: scanActive ? 'block' : 'none' }}>📡 Live Scan</button>
+          <button className={`tab-btn ${mainTab === 'scan' ? 'active' : ''}`} onClick={() => setMainTab('scan')} style={{ opacity: scanActive ? 1 : 0.5 }}>📡 Live Scan{scanActive && <span style={{background:'var(--orange)',borderRadius:10,padding:'1px 7px',marginLeft:4,fontSize:10}}>LIVE</span>}</button>
           <button className={`tab-btn ${mainTab === 'results' ? 'active' : ''}`} onClick={() => setMainTab('results')}>
             📊 Results {findings.length > 0 && <span style={{background:'var(--red)',color:'white',borderRadius:10,padding:'1px 7px',marginLeft:4,fontSize:10}}>{findings.length}</span>}
           </button>
@@ -475,7 +504,7 @@ export default function App() {
         {/* ANALYZER TAB */}
         {mainTab === 'analyzer' && (
           <div className="grid-2">
-            <BountyAnalyzer onStartScan={startScan} logs={logs} setLogs={setLogs} scanActive={scanActive} />
+            <BountyAnalyzer onStartScan={startScan} logs={logs} setLogs={setLogs} scanActive={scanActive} crawlEnabled={crawlEnabled} setCrawlEnabled={setCrawlEnabled} />
             <ConsolePanel logs={logs} title="ANALYSIS LOG" />
           </div>
         )}
@@ -483,7 +512,7 @@ export default function App() {
         {/* DIRECT SCANNER TAB */}
         {mainTab === 'scanner' && (
           <div className="grid-2">
-            <DirectScanner onStartScan={startScan} scanActive={scanActive} />
+            <DirectScanner onStartScan={startScan} scanActive={scanActive} crawlEnabled={crawlEnabled} setCrawlEnabled={setCrawlEnabled} />
             <ConsolePanel logs={logs} title="SCAN LOG" />
           </div>
         )}
