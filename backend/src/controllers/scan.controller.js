@@ -1,9 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
 const { runScan, getScan } = require('../services/scan.service');
-const { io: getIO } = require('../server');
-
-let _io;
-const setIO = (io) => { _io = io; };
 
 exports.startScan = async (req, res) => {
   try {
@@ -12,12 +8,11 @@ exports.startScan = async (req, res) => {
       return res.status(400).json({ success: false, message: 'URLs array is required' });
     }
     const scanId = uuidv4();
-    res.json({ success: true, scanId, message: 'Scan started' });
-    // Run scan async - io is injected via middleware
     const io = req.app.get('io');
+    res.json({ success: true, scanId, message: 'Scan started' });
     runScan(io, scanId, urls, { programInfo }).catch(err => {
       console.error('Scan error:', err);
-      io.to(scanId).emit('scan_error', { message: err.message });
+      if (io) io.to(scanId).emit('scan_error', { message: err.message });
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
