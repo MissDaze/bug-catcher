@@ -26,7 +26,7 @@ async function generatePDFReport(scan, programInfo) {
 
       // ---- COVER PAGE ----
       doc.rect(0, 0, doc.page.width, doc.page.height).fill(BLACK);
-      doc.fill(GREEN).fontSize(42).font('Helvetica-Bold').text('🐛 BUG CATCHER', 50, 150, { align: 'center' });
+      doc.fill(GREEN).fontSize(42).font('Helvetica-Bold').text('[ BUG CATCHER ]', 50, 150, { align: 'center' });
       doc.fill(WHITE).fontSize(18).text('Security Assessment Report', { align: 'center' });
       doc.moveDown(2);
       doc.fill(GREEN).fontSize(12).text(`Generated: ${new Date().toUTCString()}`, { align: 'center' });

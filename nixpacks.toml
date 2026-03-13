@@ -1,18 +1,20 @@
 [phases.setup]
-nixPkgs = ['nodejs_20', 'chromium', 'nss', 'atk', 'cups', 'libdrm', 'xorg.libXcomposite', 'xorg.libXdamage', 'xorg.libXrandr', 'mesa', 'xorg.libXtst', 'pango', 'alsa-lib']
+nixPkgs = ['nodejs_20', 'chromium', 'nss', 'atk', 'cups', 'libdrm', 'xorg.libXcomposite', 'xorg.libXdamage', 'xorg.libXrandr', 'mesa', 'xorg.libXtst', 'pango', 'alsa-lib', 'glib', 'dbus']
 
 [phases.install]
 cmds = [
   'cd backend && npm ci',
-  'cd frontend && npm ci',
-  'cd backend && npx playwright install chromium || true'
+  'cd frontend && npm ci'
 ]
 
 [phases.build]
 cmds = [
-  'cd frontend && CI=false npm run build',
-  'cp -r frontend/build backend/build'
+  'cd frontend && CI=false npm run build'
 ]
 
 [start]
 cmd = 'node backend/src/server.js'
+
+[variables]
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+NODE_ENV = "production"

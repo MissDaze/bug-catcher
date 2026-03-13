@@ -26,7 +26,32 @@ const LAUNCH_OPTIONS = {
   headless: true,
   args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage','--disable-gpu','--single-process','--no-zygote']
 };
-if (process.env.CHROMIUM_PATH) LAUNCH_OPTIONS.executablePath = process.env.CHROMIUM_PATH;
+// Auto-detect chromium executable path for Railway/nixpacks deployment
+const CHROMIUM_CANDIDATES = [
+  process.env.CHROMIUM_PATH,
+  process.env.PLAYWRIGHT_EXECUTABLE_PATH,
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/google-chrome',
+  '/nix/var/nix/profiles/default/bin/chromium',
+  '/run/current-system/sw/bin/chromium',
+];
+const { execSync } = require('child_process');
+let detectedChromium = null;
+for (const candidate of CHROMIUM_CANDIDATES) {
+  if (!candidate) continue;
+  try { execSync(`test -f ${candidate}`); detectedChromium = candidate; break; } catch {}
+}
+// Fallback: try which chromium
+if (!detectedChromium) {
+  try { detectedChromium = execSync('which chromium 2>/dev/null || which chromium-browser 2>/dev/null').toString().trim(); } catch {}
+}
+if (detectedChromium) {
+  LAUNCH_OPTIONS.executablePath = detectedChromium;
+  console.log(`[Browser] Using system chromium: ${detectedChromium}`);
+} else {
+  console.log('[Browser] Using Playwright bundled chromium');
+}
 
 async function getBrowser() {
   if (!playwrightAvailable || !chromium) return null;
