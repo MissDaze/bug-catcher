@@ -20,11 +20,13 @@ async function fetchWithPlaywright(url) {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     });
     await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-    // Wait extra for SPA content
-    await page.waitForTimeout(3000);
+    // Wait extra for SPA content to fully render
+    await page.waitForTimeout(4000);
     const html = await page.content();
     const $ = cheerio.load(html);
-    $('script, style, nav, footer, header').remove();
+    // Only remove scripts and styles for text extraction - keep nav/header/footer
+    // as scope sections may appear in sidebars or navigation-like elements
+    $('script, style').remove();
     const text = $('body').text().replace(/\s+/g, ' ').trim();
     return { text, html, status: 200, url };
   } catch (err) {
@@ -36,7 +38,7 @@ async function fetchWithPlaywright(url) {
 
 async function fetchPageContent(url) {
   const isJsHeavy = JS_HEAVY_DOMAINS.some(d => url.includes(d));
-  
+
   if (isJsHeavy) {
     try {
       console.log(`Using Playwright for JS-heavy page: ${url}`);
@@ -45,7 +47,7 @@ async function fetchPageContent(url) {
       console.warn(`Playwright failed, falling back to axios: ${pwErr.message}`);
     }
   }
-  
+
   try {
     const response = await axios.get(url, {
       headers: {
@@ -56,10 +58,11 @@ async function fetchPageContent(url) {
       timeout: 30000,
       maxRedirects: 5
     });
-    const $ = cheerio.load(response.data);
-    $('script, style, nav, footer').remove();
-    const text = $('body').text().replace(/\s+/g, ' ').trim();
     const html = response.data;
+    const $ = cheerio.load(html);
+    // Only remove scripts and styles - preserve nav/header/footer for scope extraction
+    $('script, style').remove();
+    const text = $('body').text().replace(/\s+/g, ' ').trim();
     return { text, html, status: response.status, headers: response.headers, url: response.config.url };
   } catch (err) {
     throw new Error(`Failed to fetch ${url}: ${err.message}`);
