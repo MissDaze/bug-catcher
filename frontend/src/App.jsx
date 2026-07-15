@@ -5,6 +5,28 @@ import axios from 'axios';
 const API = process.env.REACT_APP_API_URL || '';
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || window.location.origin;
 
+// Demo access code gate — attaches the code from localStorage to every
+// request, and on a 401 "gated" response, prompts once and retries.
+axios.interceptors.request.use((cfg) => {
+  cfg.headers['X-Demo-Code'] = localStorage.getItem('demo_code') || '';
+  return cfg;
+});
+axios.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const { config, response } = error;
+    if (response?.status === 401 && response.data?.gated && !config._demoRetry) {
+      const entered = window.prompt('Enter the demo access code to continue:');
+      if (entered) {
+        localStorage.setItem('demo_code', entered.trim());
+        config._demoRetry = true;
+        return axios(config);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 const TOP_PLATFORMS = [
   { name: 'HackerOne', url: 'https://hackerone.com/bug-bounty-programs', icon: '🔒' },
   { name: 'Bugcrowd', url: 'https://bugcrowd.com/programs', icon: '👑' },

@@ -13,6 +13,7 @@ const scanRoutes = require('./routes/scan.routes');
 const bountyRoutes = require('./routes/bounty.routes');
 const reportRoutes = require('./routes/report.routes');
 const { cancelScan } = require('./services/scan.service');
+const { demoGate } = require('./middleware/demoGate');
 
 const app = express();
 const server = http.createServer(app);
@@ -39,9 +40,9 @@ app.use('/reports', express.static(path.join(__dirname, '../reports')));
 const frontendBuild = path.join(__dirname, '../../frontend/build');
 if (fs.existsSync(frontendBuild)) app.use(express.static(frontendBuild));
 
-app.use('/api/scan', scanLimiter, scanRoutes);
-app.use('/api/bounty', bountyLimiter, bountyRoutes);
-app.use('/api/report', reportRoutes);
+app.use('/api/scan', demoGate, scanLimiter, scanRoutes);
+app.use('/api/bounty', demoGate, bountyLimiter, bountyRoutes);
+app.use('/api/report', demoGate, reportRoutes);
 app.get('/api/health', (req, res) => res.json({ status: 'OK', time: new Date().toISOString() }));
 
 app.get('*', (req, res) => {
